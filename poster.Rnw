@@ -37,13 +37,26 @@ between the Both case and the Physically-only or Mentally-only
 cases. Therefore the ratio of ``unlimited'' to ``85'' is used as the
 dependent variable for the following charts (and denoted ``unlimited:85'').
 
+<<echo=FALSE>>=
+df$Health.Status <- df$Q6.How.healthy.do.you.feel..physically.and.mentally.
+df$Health.Status <- factor(df$Health.Status, c("Severely unhealthy", "Unhealthy", "Fine", "Quite healthy", "Perfectly healthy"))
+df2 <- cast(df, variable + value + Age.Range + Health.Status ~ ., length)
+@
+
 \begin{figure}
 <<fig=TRUE, echo=FALSE>>=
-df2 <- cast(df, variable + value + Age.Range ~ ., length)
-df2 <- ddply(df2, c("Age.Range", "variable"), function(x) sum(x[x$value=="Unlimited","(all)"]/sum(x[x$value=="85","(all)"])))
-print(ggplot(df2, aes(x = Age.Range, group=variable, y=V1)) + geom_line(aes(colour = variable)) + geom_point(aes(colour = variable)) + xlab("Age") + ylab("Unlimied:85 ratio"))
+df3 <- ddply(df2, c("Age.Range", "variable"), function(x) sum(x[x$value=="Unlimited","(all)"]/sum(x[x$value=="85","(all)"])))
+print(ggplot(df3, aes(x = Age.Range, group=variable, y=V1)) + geom_line(aes(colour = variable)) + geom_point(aes(colour = variable)) + xlab("Age") + ylab("Unlimied:85 ratio"))
 @
 \caption{The unlimited:85 ratio as a function of age group.}
+\end{figure}
+
+\begin{figure}
+<<fig=TRUE, echo=FALSE>>=
+df3 <- ddply(df2, c("Health.Status", "variable"), function(x) sum(x[x$value=="Unlimited","(all)"]/sum(x[x$value=="85","(all)"])))
+print(ggplot(df3, aes(x = Health.Status, group=variable, y=V1)) + geom_line(aes(colour = variable)) + geom_point(aes(colour = variable)) + xlab("Age") + ylab("Unlimied:85 ratio"))
+@
+\caption{The unlimited:85 ratio as a function of health status.}
 \end{figure}
 
 \end{document}
