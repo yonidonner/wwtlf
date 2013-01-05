@@ -40,7 +40,12 @@ dependent variable for the following charts (and denoted ``unlimited:85'').
 <<echo=FALSE>>=
 df$Health.Status <- df$Q6.How.healthy.do.you.feel..physically.and.mentally.
 df$Health.Status <- factor(df$Health.Status, c("Severely unhealthy", "Unhealthy", "Fine", "Quite healthy", "Perfectly healthy"))
-df2 <- cast(df, variable + value + Age.Range + Health.Status ~ ., length)
+df$Self.Esteem <- df$Q10.I.have.high.self.esteem.
+df$Self.Esteem <- factor(df$Self.Esteem, c("Not at all true of me", "Not very true of me", "Very true of me", "Completely true of me"))
+df$Science.Interest <- df$Q7.How.interested.are.you.in.topics.related.to.science.and.technology.
+df$Science.Interest <- factor(df$Science.Interest, c("Disinterested", "Slightly interested", "Moderately interested", "Quite interested", "Avidly interested"))
+df2 <- cast(df, variable + value + Age.Range + Health.Status +
+Self.Esteem + Science.Interest ~ ., length)
 @
 
 \begin{figure}
@@ -53,8 +58,24 @@ print(ggplot(df3, aes(x = Age.Range, group=variable, y=V1)) + geom_line(aes(colo
 
 \begin{figure}
 <<fig=TRUE, echo=FALSE>>=
+df3 <- ddply(df2, c("Self.Esteem", "variable"), function(x) sum(x[x$value=="Unlimited","(all)"]/sum(x[x$value=="85","(all)"])))
+print(ggplot(df3, aes(x = Self.Esteem, group=variable, y=V1)) + geom_line(aes(colour = variable)) + geom_point(aes(colour = variable)) + xlab("Self esteem") + ylab("Unlimied:85 ratio"))
+@
+\caption{The unlimited:85 ratio as a function of self esteem.}
+\end{figure}
+
+\begin{figure}
+<<fig=TRUE, echo=FALSE>>=
+df3 <- ddply(df2, c("Science.Interest", "variable"), function(x) sum(x[x$value=="Unlimited","(all)"]/sum(x[x$value=="85","(all)"])))
+print(ggplot(df3, aes(x = Science.Interest, group=variable, y=V1)) + geom_line(aes(colour = variable)) + geom_point(aes(colour = variable)) + xlab("Interest in science") + ylab("Unlimied:85 ratio"))
+@
+\caption{The unlimited:85 ratio as a function of interest in science.}
+\end{figure}
+
+\begin{figure}
+<<fig=TRUE, echo=FALSE>>=
 df3 <- ddply(df2, c("Health.Status", "variable"), function(x) sum(x[x$value=="Unlimited","(all)"]/sum(x[x$value=="85","(all)"])))
-print(ggplot(df3, aes(x = Health.Status, group=variable, y=V1)) + geom_line(aes(colour = variable)) + geom_point(aes(colour = variable)) + xlab("Age") + ylab("Unlimied:85 ratio"))
+print(ggplot(df3, aes(x = Health.Status, group=variable, y=V1)) + geom_line(aes(colour = variable)) + geom_point(aes(colour = variable)) + xlab("Health status") + ylab("Unlimied:85 ratio"))
 @
 \caption{The unlimited:85 ratio as a function of health status.}
 \end{figure}
