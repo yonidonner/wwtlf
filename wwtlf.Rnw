@@ -11,6 +11,7 @@
 <<echo=FALSE>>=
 library(ggplot2)
 library(reshape)
+library(MASS)
 
 survey <- read.csv("data/surveyResults.csv",header=TRUE)
 @
@@ -22,6 +23,7 @@ survey <- read.csv("data/surveyResults.csv",header=TRUE)
 df <- melt(survey, measure.vars = c(20,21,22))
 df$variable <- factor(df$variable, labels = c("Q2","Q3","Q4"))
 df$variable <- factor(df$variable, c("Q3", "Q4", "Q2"))
+df$value <- factor(df$value, c("85","120","150","Unlimited"))
 df2 <- cast(df, variable + value ~ ., length)
 df2$all <- df2[,"(all)"]
 df2$value <- factor(df2$value, c("85","120","150","Unlimited"))
@@ -31,6 +33,51 @@ print(ggplot(df2, aes(x = value, weight = all, fill = variable)) + geom_bar(posi
 half want to die at 85. But, if neither mental nor physical decline is
 expected, then 80\% want to live $\geq$ 120 years!}
 \end{figure}
+
+Next we do an ordinal regression for desired age using the respondent age.
+
+<<echo=FALSE>>=
+print(summary(polr(value ~ Age.Range, data=subset(df, variable=="Q4"))))
+@
+
+Why are people in the range 35--44 more interested in living longer?
+
+<<echo=FALSE>>=
+df$collapsed.health <- df$Health.Status
+levels(df$collapsed.health) <- c("Unhealthy", "Unhealthy", "Healthy", "Healthy", "Healthy")
+df$life.satisfaction <- df$Q9
+levels(df$life.satisfaction) <- c("Dissatisfied", "Satisfied", "Satisfied", "Dissatisfied", "Satisfied")
+df$self.esteem <- df$Q10
+levels(df$self.esteem) <- c("Yes", "No", "No", "Yes")
+df$relationship <- df$Relationship.Status
+levels(df$relationship) <- c("Ex", "Relationship", "Complicated", "Relationship", "Relationship", "Single", "Ex")
+df$science <- df$Q7
+levels(df$science) <- c("Love", "Hate", "Love", "Love", "Love")
+df$religion <- df$Q8
+levels(df$religion) <- c("Yes", "No", "Yes", "No", "Yes")
+@
+
+<<>>=
+diseases <- ldply(grep("Q12", names(df)), function(field) {
+    condition.name <- levels(df[,field])[2]
+    formula.str <- paste("value ~",names(df)[field])
+    print(formula.str)
+    pr1 <- do.call("polr", list(formula = as.formula(formula.str), data=subset(df,variable=="Q4")))
+    data.frame(condition.name = condition.name, t.value = summary(pr1)$coefficients[1,"t value"])
+})
+
+df.diseases <- df
+df.diseases$num.disease <- rowSums(df[,names(df)[grep("Q12",names(df))[1:9]]]!="")
+df.diseases$any.disease <- as.numeric(df.diseases$num.disease > 0)
+pr <- polr(value ~ any.disease, data=subset(df.diseases, variable=="Q4"))
+pr2 <- polr(value ~ 1, data=subset(df.diseases, variable=="Q4"))
+@
+
+Looking at age and gender:
+
+<<echo=FALSE>>=
+print(summary(polr(value ~ Age.Range * Gender, data=subset(df, variable=="Q4"))))
+@
 
 The responses for ``120'' and ``150'' do not change signiﬁcantly
 between the Both case and the Physically-only or Mentally-only
