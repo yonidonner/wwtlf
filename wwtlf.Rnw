@@ -12,6 +12,7 @@
 library(ggplot2)
 library(reshape)
 library(MASS)
+library(xtable)
 
 survey <- read.csv("data/surveyResults.csv",header=TRUE)
 @
@@ -27,104 +28,323 @@ df$value <- factor(df$value, c("85","120","150","Unlimited"))
 df2 <- cast(df, variable + value ~ ., length)
 df2$all <- df2[,"(all)"]
 df2$value <- factor(df2$value, c("85","120","150","Unlimited"))
-print(ggplot(df2, aes(x = value, weight = all, fill = variable)) + geom_bar(position = "dodge") + xlab("Desired age") + ylab("Number of respondents") + scale_fill_discrete(name="Question", breaks=c("Q3","Q2","Q4"), labels=c("Physically but not mentally", "Mentally but not physically", "Both")))
+print(ggplot(df2, aes(x = value, weight = all, fill = variable)) + geom_bar(position = "dodge") + xlab("Desired age") + ylab("Number of respondents") + scale_fill_discrete(name="Question", breaks=c("Q3","Q4","Q2"), labels=c("Physically but\nnot mentally", "Mentally but\nnot physically", "Both")))
 @
 \caption{If either mental or physical decline is expected, more than
 half want to die at 85. But, if neither mental nor physical decline is
 expected, then 80\% want to live $\geq$ 120 years!}
 \end{figure}
 
-Next we do an ordinal regression for desired age using the respondent age.
+%% Next we do an ordinal regression for desired age using the respondent age.
+
+%% <<echo=FALSE>>=
+%% print(summary(polr(value ~ Age.Range, data=subset(df, variable=="Q4"))))
+%% @
+
+%% Why are people in the range 35--44 more interested in living longer?
 
 <<echo=FALSE>>=
-print(summary(polr(value ~ Age.Range, data=subset(df, variable=="Q4"))))
-@
-
-Why are people in the range 35--44 more interested in living longer?
-
-<<echo=FALSE>>=
-df$collapsed.health <- df$Health.Status
-levels(df$collapsed.health) <- c("Unhealthy", "Unhealthy", "Healthy", "Healthy", "Healthy")
-df$life.satisfaction <- df$Q9
-levels(df$life.satisfaction) <- c("Dissatisfied", "Satisfied", "Satisfied", "Dissatisfied", "Satisfied")
-df$self.esteem <- df$Q10
-levels(df$self.esteem) <- c("Yes", "No", "No", "Yes")
-df$relationship <- df$Relationship.Status
-levels(df$relationship) <- c("Ex", "Relationship", "Complicated", "Relationship", "Relationship", "Single", "Ex")
-df$science <- df$Q7
-levels(df$science) <- c("Love", "Hate", "Love", "Love", "Love")
-df$religion <- df$Q8
-levels(df$religion) <- c("Yes", "No", "Yes", "No", "Yes")
-@
-
-<<>>=
-diseases <- ldply(grep("Q12", names(df)), function(field) {
-    condition.name <- levels(df[,field])[2]
-    formula.str <- paste("value ~",names(df)[field])
-    print(formula.str)
-    pr1 <- do.call("polr", list(formula = as.formula(formula.str), data=subset(df,variable=="Q4")))
-    data.frame(condition.name = condition.name, t.value = summary(pr1)$coefficients[1,"t value"])
+new.df <- data.frame(ID = survey$ID, preamble = survey$Preamble, age = survey$Age.Range, career = survey$Career, children = survey$Children,
+                     education = factor(survey$Education, levels = c("No college", "Some college", "2yr degree", "4yr degree", "Professional degree", "Grad school degree")),
+                     employment = factor(survey$Employment.Status, levels = c("Unemployed", "Part Time", "Full time", "Student", "Retired")),
+                     ethnicity = survey$Ethnicity...Race,
+                     gender = survey$Gender,
+                     income = factor(survey$Income.Range, levels = c("$0 - $25,000", "$25,000 - $50,000", "$50,000 - $75,000", "$75,000 - $100,000",  "$100,000 - $200,000", "$200,000 - $500,000", ">$500,000")),
+                     relationship = factor(survey$Relationship.Status, levels = c("Divorced", "Engaged", "It's complicated ", "Living with a significant other", "Married", "Single", "Widowed")),
+                     both.same = factor(survey$Q2.If.you.could.be.physically...mentally.the.same.as.your.20s..how.long.would.you.like.to.live., levels = c("85", "120", "150", "Unlimited"), ordered = TRUE),
+                     only.physically = factor(survey$Q3.If.you.could.be.physically.the.same.but.NOT.mentally.the.same.as.your.20s..how.long.would.you.like.to.live., levels = c("85", "120", "150", "Unlimited"), ordered = TRUE),
+                     only.mentally = factor(survey$Q4.If.you.could.be.mentally.the.same.but.NOT.physically.the.same.as.your.20s..how.long.would.you.like.to.live., levels = c("85", "120", "150", "Unlimited"), ordered = TRUE),
+                     expected.lifespan = factor(survey$Q5.How.long.do.you.expect.to.live., levels = c("Less than 70", "70-79", "80-89", "90-99", "100-119", "120-149", "150 or longer")),
+                     health = factor(survey$Q6.How.healthy.do.you.feel..physically.and.mentally., levels = c("Severely unhealthy", "Unhealthy", "Fine", "Quite healthy", "Perfectly healthy")),
+                     science = factor(survey$Q7.How.interested.are.you.in.topics.related.to.science.and.technology., levels = c("Disinterested", "Slightly interested", "Moderately interested", "Quite interested", "Avidly interested")),
+                     religion = factor(survey$Q8.How.important.is.religion.in.your.life., levels = c("Irrelevant", "Somewhat important", "Moderately important", "Essential", "Very important")),
+                     life.satisfaction = factor(survey$Q9.All.things.considered..how.satisfied.are.you.with.your.life.as.a.whole., levels = c("Totally dissatisfied", "Mostly dissatisfied", "Somewhat satisfied", "Mostly satisfied", "Totally satisfied")),
+                     self.esteem = factor(survey$Q10.I.have.high.self.esteem., levels = c("Not at all true of me", "Not very true of me", "Completely true of me", "Very true of me")),
+                     optimism = factor(survey$Q11.I.m.always.optimistic.about.my.future., levels = c("I disagree a lot", "I somewhat disagree", "I somewhat agree", "I agree a lot")))
+levels(new.df$relationship) <- c("Ex", "Relationship", "Complicated", "Relationship", "Relationship", "Single", "Ex")
+levels(new.df$health) <- c("Unhealthy", "Unhealthy", "Healthy", "Healthy", "Healthy")
+levels(new.df$science) <- c("Hate", "Love", "Love", "Love", "Love")
+levels(new.df$religion) <- c("No", "No", "Yes", "Yes", "Yes")
+levels(new.df$life.satisfaction) <- c("Dissatisfied","Dissatisfied","Satisfied","Satisfied","Satisfied")
+new.df$num.disease <- rowSums(survey[,names(survey)[grep("Q12",names(survey))[1:9]]]!="")
+new.df$any.disease <- as.numeric(new.df$num.disease > 0)
+#df.diseases <- df
+#df.diseases$num.disease <- rowSums(df[,names(df)[grep("Q12",names(df))[1:9]]]!="")
+#df.diseases$any.disease <- as.numeric(df.diseases$num.disease > 0)
+#new.df$num.disease <- df.diseases$num.disease
+#new.df$any.disease <- df.diseases$any.disease
+#new.df.Q2 <- subset(new.df, question == "Q2")
+fields <- c("preamble", "age", "career", "children", "education", "employment", "ethnicity", "gender", "income", "relationship", "expected.lifespan", "health", "science", "religion", "life.satisfaction", "self.esteem", "optimism", "num.disease", "any.disease")
+sigs <- ldply(fields, function(field) {
+    formula.str <- paste("answer ~",field)
+    pr0 <- polr(answer ~ 1, data=new.df.Q2)
+    pr1 <- do.call("polr", list(formula = as.formula(formula.str), data=new.df.Q2))
+    p.val <- anova(pr0, pr1)[2,"Pr(Chi)"]
+    p.val2 <- do.call("kruskal.test", list(formula=as.formula(formula.str), data=new.df.Q2))$p.value
+    data.frame(field = field, p.val = p.val, kruskal.wallis = p.val2)
 })
-
-df.diseases <- df
-df.diseases$num.disease <- rowSums(df[,names(df)[grep("Q12",names(df))[1:9]]]!="")
-df.diseases$any.disease <- as.numeric(df.diseases$num.disease > 0)
-pr <- polr(value ~ any.disease, data=subset(df.diseases, variable=="Q4"))
-pr2 <- polr(value ~ 1, data=subset(df.diseases, variable=="Q4"))
 @
-
-Looking at age and gender:
 
 <<echo=FALSE>>=
-print(summary(polr(value ~ Age.Range * Gender, data=subset(df, variable=="Q4"))))
+expectation.fields = c("preamble", "age", "career", "children", "education", "employment", "ethnicity", "gender", "income", "relationship", "health", "science", "religion", "life.satisfaction", "self.esteem", "optimism", "num.disease", "any.disease")
+expectation.sigs <- ldply(expectation.fields, function(field) {
+    formula.str <- paste("expected.lifespan ~",field)
+    pr0 <- polr(expected.lifespan ~ 1, data=new.df)
+    pr1 <- do.call("polr", list(formula = as.formula(formula.str), data=new.df))
+    p.val <- anova(pr0, pr1)[2,"Pr(Chi)"]
+    p.val2 <- do.call("kruskal.test", list(formula=as.formula(formula.str), data=new.df))$p.value
+    data.frame(field = field, p.val = p.val, kruskal.wallis = p.val2)
+})
+bothsame.fields = c("preamble", "age", "career", "children",
+"education", "employment", "ethnicity", "gender", "income", "relationship", "health", "science", "religion", "expected.lifespan", "life.satisfaction", "self.esteem", "optimism", "num.disease", "any.disease")
+bothsame.sigs <- ldply(bothsame.fields, function(field) {
+    formula.str <- paste("both.same ~",field)
+    pr0 <- polr(both.same ~ 1, data=new.df)
+    pr1 <- do.call("polr", list(formula = as.formula(formula.str), data=new.df))
+    p.val <- anova(pr0, pr1)[2,"Pr(Chi)"]
+    p.val2 <- do.call("kruskal.test", list(formula=as.formula(formula.str), data=new.df))$p.value
+    data.frame(field = field, p.val = p.val, kruskal.wallis = p.val2)
+})
 @
 
-The responses for ``120'' and ``150'' do not change signiﬁcantly
-between the Both case and the Physically-only or Mentally-only
-cases. Therefore the ratio of ``unlimited'' to ``85'' is used as the
-dependent variable for the following charts (and denoted ``unlimited:85'').
+What fraction of people switched their answers when told explicitly
+they'd live in good physical and mental health?
 
 <<echo=FALSE>>=
-df$Health.Status <- df$Q6.How.healthy.do.you.feel..physically.and.mentally.
-df$Health.Status <- factor(df$Health.Status, c("Severely unhealthy", "Unhealthy", "Fine", "Quite healthy", "Perfectly healthy"))
-df$Self.Esteem <- df$Q10.I.have.high.self.esteem.
-df$Self.Esteem <- factor(df$Self.Esteem, c("Not at all true of me", "Not very true of me", "Very true of me", "Completely true of me"))
-df$Science.Interest <- df$Q7.How.interested.are.you.in.topics.related.to.science.and.technology.
-df$Science.Interest <- factor(df$Science.Interest, c("Disinterested", "Slightly interested", "Moderately interested", "Quite interested", "Avidly interested"))
-df2 <- cast(df, variable + value + Age.Range + Health.Status +
-Self.Esteem + Science.Interest ~ ., length)
+fraction.movers <- function(q1, q2) {
+    T <- table(q1, q2)
+    movers <- sum(T[upper.tri(T)])
+    total <- sum(T[1:3,])
+    to.unlimited <- sum(T[1:3,4])
+    data.frame(movers = movers, total = total, to.unlimited = to.unlimited)
+}
+new.df$min.physically.mentally <- pmin(new.df$only.physically, new.df$only.mentally)
+new.df$max.physically.mentally <- pmax(new.df$only.physically, new.df$only.mentally)
+all.movers <- rbind(fraction.movers(new.df$only.physically, new.df$both.same), fraction.movers(new.df$only.mentally, new.df$both.same), fraction.movers(new.df$min.physically.mentally, new.df$both.same), fraction.movers(new.df$max.physically.mentally, new.df$both.same))
+all.movers$moved.from <- factor(c("Only physically", "Only mentally", "Min of either one", "Max of either one"), levels = c("Only physically", "Only mentally", "Min of either one", "Max of either one"))
+@
+
+%% THE SCIENCE FIGURE
+
+
+
+\begin{figure}
+<<fig=TRUE, echo=FALSE>>=
+to.plot <- transform(melt(all.movers, measure.vars = c("movers", "to.unlimited")), fraction = value/total)
+print(ggplot(to.plot, aes(x = moved.from, y = fraction, fill = variable)) + geom_bar(position = "dodge", stat="identity"))
+@
+\caption{Fraction of people who changed their answers when the
+  question made it clear they would live in physical and mental good health.}
+\end{figure}
+
+<<echo=FALSE>>=
+new.df$nonmover <- new.df$min.physically.mentally >= new.df$both.same
+new.df$moved.to.unlimited <- (new.df$min.physically.mentally < "Unlimited") & (new.df$both.same == "Unlimited")
+new.df2 <- subset(new.df, min.physically.mentally == "85")
+new.df2$mover <- factor(rep("lamer", nrow(new.df2)), levels = c("lamer", "optimist", "immortalist"))
+new.df2[!new.df2$nonmover & !new.df2$moved.to.unlimited,"mover"] <- "optimist"
+new.df2[!new.df2$nonmover & new.df2$moved.to.unlimited,"mover"] <- "immortalist"
+new.df2[,"actual.mover"] <- new.df2[,"mover"]
+levels(new.df2[,"actual.mover"]) <- c("nonmover","mover","mover")
+@
+
+We next focus on people who answered 85 to either only-physically or only-mentally.
+
+\begin{figure}
+<<fig=TRUE, echo=FALSE>>=
+print(ggplot(new.df2, aes(x = both.same)) + geom_bar())
+@
+\caption{Out of the people who answered 85 to either only-physically
+  or only-mentally, what did they answer to good health in both?}
+\end{figure}
+
+Descriptive statistics of the sample:
+
+<<echo=FALSE, results=tex>>=
+for (field in fields) {
+    dsdf <- data.frame(table(new.df.Q2[,field]))
+    colnames(dsdf) <- c(field,"Count")
+    print(xtable(dsdf), include.rownames = FALSE)
+}
+@
+
+<<echo=FALSE>>=
+sigs2 <- ldply(fields, function(field) {
+    formula.str <- paste("mover ~",field)
+    pr0 <- polr(mover ~ 1, data=new.df2)
+    pr1 <- do.call("polr", list(formula = as.formula(formula.str), data=new.df2))
+    p.val <- anova(pr0, pr1)[2,"Pr(Chi)"]
+    p.val2 <- do.call("kruskal.test", list(formula=as.formula(formula.str), data=new.df2))$p.value
+    data.frame(field = field, p.val = p.val, kruskal.wallis = p.val2)
+})
+sigs3 <- ldply(fields, function(field) {
+    formula.str <- paste("actual.mover ~",field)
+    pr0 <- glm(actual.mover ~ 1, data=new.df2)
+    pr1 <- do.call("polr", list(formula = as.formula(formula.str), data=new.df2))
+    p.val <- anova(pr0, pr1)[2,"Pr(Chi)"]
+    p.val2 <- do.call("kruskal.test", list(formula=as.formula(formula.str), data=new.df2))$p.value
+    data.frame(field = field, p.val = p.val, kruskal.wallis = p.val2)
+})
 @
 
 \begin{figure}
 <<fig=TRUE, echo=FALSE>>=
-df3 <- ddply(df2, c("Age.Range", "variable"), function(x) sum(x[x$value=="Unlimited","(all)"]/sum(x[x$value=="85","(all)"])))
-print(ggplot(df3, aes(x = Age.Range, group=variable, y=V1)) + geom_line(aes(colour = variable)) + geom_point(aes(colour = variable)) + xlab("Age") + ylab("Unlimied:85 ratio"))
+print(ggplot(new.df2, aes(x = expected.lifespan, fill = mover)) + geom_bar(position="dodge"))
 @
-\caption{The unlimited:85 ratio as a function of age group.}
+\caption{Expected lifespan is a strong predictor of wanting to live
+  forever in good physical and mental health.}
 \end{figure}
 
 \begin{figure}
 <<fig=TRUE, echo=FALSE>>=
-df3 <- ddply(df2, c("Self.Esteem", "variable"), function(x) sum(x[x$value=="Unlimited","(all)"]/sum(x[x$value=="85","(all)"])))
-print(ggplot(df3, aes(x = Self.Esteem, group=variable, y=V1)) + geom_line(aes(colour = variable)) + geom_point(aes(colour = variable)) + xlab("Self esteem") + ylab("Unlimied:85 ratio"))
+print(ggplot(new.df2, aes(x = science, fill = mover)) + geom_bar(position="dodge"))
 @
-\caption{The unlimited:85 ratio as a function of self esteem.}
+\caption{Attitude to science is a strong predictor of wanting to live
+  forever in good physical and mental health.}
+\end{figure}
+
+<<echo=FALSE, results=tex>>=
+print(xtable(sigs2, digits=c(0,0,6,6)), include.rownames = FALSE)
+@
+
+<<echo=FALSE>>=
+plot.frequencies.with.n <- function(df, x.field, y.field) {
+    dd <- ddply(df, x.field, nrow)
+    dd$labels <- as.vector(dd$V1)
+    dd$x <- dd[,x.field]
+    dd$y <- 1
+    p <- ggplot() + geom_bar(data=df, aes_string(x = x.field, fill=y.field), position="fill")
+    p <- p + scale_y_continuous(name="proportion")
+    p <- p + geom_text(data=dd, aes(x = x, label = V1, y=y), vjust=-0.5, size=4)
+    p
+}
+@
+
+\begin{figure}
+<<fig=TRUE, echo=FALSE>>=
+print(plot.frequencies.with.n(new.df.Q2, "education", "expected.lifespan"))
+@
+\caption{The super-educated know they will not live to 150.}
 \end{figure}
 
 \begin{figure}
 <<fig=TRUE, echo=FALSE>>=
-df3 <- ddply(df2, c("Science.Interest", "variable"), function(x) sum(x[x$value=="Unlimited","(all)"]/sum(x[x$value=="85","(all)"])))
-print(ggplot(df3, aes(x = Science.Interest, group=variable, y=V1)) + geom_line(aes(colour = variable)) + geom_point(aes(colour = variable)) + xlab("Interest in science") + ylab("Unlimied:85 ratio"))
+print(plot.frequencies.with.n(new.df.Q2, "expected.lifespan", "answer"))
 @
-\caption{The unlimited:85 ratio as a function of interest in science.}
+\caption{If you expect to live to 150, you also want to.}
 \end{figure}
 
 \begin{figure}
 <<fig=TRUE, echo=FALSE>>=
-df3 <- ddply(df2, c("Health.Status", "variable"), function(x) sum(x[x$value=="Unlimited","(all)"]/sum(x[x$value=="85","(all)"])))
-print(ggplot(df3, aes(x = Health.Status, group=variable, y=V1)) + geom_line(aes(colour = variable)) + geom_point(aes(colour = variable)) + xlab("Health status") + ylab("Unlimied:85 ratio"))
+print(plot.frequencies.with.n(new.df.Q2, "science", "answer"))
 @
-\caption{The unlimited:85 ratio as a function of health status.}
+\caption{People who love science want to live longer.}
 \end{figure}
+
+\begin{figure}
+<<fig=TRUE, echo=FALSE>>=
+print(plot.frequencies.with.n(new.df.Q2, "religion", "answer"))
+@
+\caption{Religious people really want to live to exactly 120.}
+\end{figure}
+
+\begin{figure}
+<<fig=TRUE, echo=FALSE>>=
+print(plot.frequencies.with.n(new.df.Q2, "gender", "answer"))
+@
+\caption{Men want unlimited lives, while some women want to die at 85.}
+\end{figure}
+
+\begin{figure}
+<<fig=TRUE, echo=FALSE>>=
+print(plot.frequencies.with.n(new.df.Q2, "health", "answer"))
+@
+\caption{People who love science want to live longer.}
+\end{figure}
+
+%% <<echo=FALSE>>=
+%% df$collapsed.health <- df$Health.Status
+%% levels(df$collapsed.health) <- c("Unhealthy", "Unhealthy", "Healthy", "Healthy", "Healthy")
+%% df$life.satisfaction <- df$Q9
+%% levels(df$life.satisfaction) <- c("Dissatisfied", "Satisfied", "Satisfied", "Dissatisfied", "Satisfied")
+%% df$self.esteem <- df$Q10
+%% levels(df$self.esteem) <- c("Yes", "No", "No", "Yes")
+%% df$relationship <- df$Relationship.Status
+%% levels(df$relationship) <- c("Ex", "Relationship", "Complicated", "Relationship", "Relationship", "Single", "Ex")
+%% df$science <- df$Q7
+%% levels(df$science) <- c("Love", "Hate", "Love", "Love", "Love")
+%% df$religion <- df$Q8
+%% levels(df$religion) <- c("Yes", "No", "Yes", "No", "Yes")
+%% @
+
+%% <<echo=FALSE>>=
+%% diseases <- ldply(grep("Q12", names(df)), function(field) {
+%%     condition.name <- levels(df[,field])[2]
+%%     formula.str <- paste("value ~",names(df)[field])
+%%     print(formula.str)
+%%     pr1 <- do.call("polr", list(formula = as.formula(formula.str), data=subset(df,variable=="Q4")))
+%%     data.frame(condition.name = condition.name, t.value = summary(pr1)$coefficients[1,"t value"])
+%% })
+
+%% df.diseases <- df
+%% df.diseases$num.disease <- rowSums(df[,names(df)[grep("Q12",names(df))[1:9]]]!="")
+%% df.diseases$any.disease <- as.numeric(df.diseases$num.disease > 0)
+%% pr <- polr(value ~ any.disease, data=subset(df.diseases, variable=="Q4"))
+%% pr2 <- polr(value ~ 1, data=subset(df.diseases, variable=="Q4"))
+%% @
+
+%% Looking at age and gender:
+
+%% <<echo=FALSE>>=
+%% print(summary(polr(value ~ Age.Range * Gender, data=subset(df, variable=="Q4"))))
+%% @
+
+%% The responses for ``120'' and ``150'' do not change signiﬁcantly
+%% between the Both case and the Physically-only or Mentally-only
+%% cases. Therefore the ratio of ``unlimited'' to ``85'' is used as the
+%% dependent variable for the following charts (and denoted ``unlimited:85'').
+
+%% <<echo=FALSE>>=
+%% df$Health.Status <- df$Q6.How.healthy.do.you.feel..physically.and.mentally.
+%% df$Health.Status <- factor(df$Health.Status, c("Severely unhealthy", "Unhealthy", "Fine", "Quite healthy", "Perfectly healthy"))
+%% df$Self.Esteem <- df$Q10.I.have.high.self.esteem.
+%% df$Self.Esteem <- factor(df$Self.Esteem, c("Not at all true of me", "Not very true of me", "Very true of me", "Completely true of me"))
+%% df$Science.Interest <- df$Q7.How.interested.are.you.in.topics.related.to.science.and.technology.
+%% df$Science.Interest <- factor(df$Science.Interest, c("Disinterested", "Slightly interested", "Moderately interested", "Quite interested", "Avidly interested"))
+%% df2 <- cast(df, variable + value + Age.Range + Health.Status +
+%% Self.Esteem + Science.Interest ~ ., length)
+%% @
+
+%% \begin{figure}
+%% <<fig=TRUE, echo=FALSE>>=
+%% df3 <- ddply(df2, c("Age.Range", "variable"), function(x) sum(x[x$value=="Unlimited","(all)"]/sum(x[x$value=="85","(all)"])))
+%% print(ggplot(df3, aes(x = Age.Range, group=variable, y=V1)) + geom_line(aes(colour = variable)) + geom_point(aes(colour = variable)) + xlab("Age") + ylab("Unlimied:85 ratio"))
+%% @
+%% \caption{The unlimited:85 ratio as a function of age group.}
+%% \end{figure}
+
+%% \begin{figure}
+%% <<fig=TRUE, echo=FALSE>>=
+%% df3 <- ddply(df2, c("Self.Esteem", "variable"), function(x) sum(x[x$value=="Unlimited","(all)"]/sum(x[x$value=="85","(all)"])))
+%% print(ggplot(df3, aes(x = Self.Esteem, group=variable, y=V1)) + geom_line(aes(colour = variable)) + geom_point(aes(colour = variable)) + xlab("Self esteem") + ylab("Unlimied:85 ratio"))
+%% @
+%% \caption{The unlimited:85 ratio as a function of self esteem.}
+%% \end{figure}
+
+%% \begin{figure}
+%% <<fig=TRUE, echo=FALSE>>=
+%% df3 <- ddply(df2, c("Science.Interest", "variable"), function(x) sum(x[x$value=="Unlimited","(all)"]/sum(x[x$value=="85","(all)"])))
+%% print(ggplot(df3, aes(x = Science.Interest, group=variable, y=V1)) + geom_line(aes(colour = variable)) + geom_point(aes(colour = variable)) + xlab("Interest in science") + ylab("Unlimied:85 ratio"))
+%% @
+%% \caption{The unlimited:85 ratio as a function of interest in science.}
+%% \end{figure}
+
+%% \begin{figure}
+%% <<fig=TRUE, echo=FALSE>>=
+%% df3 <- ddply(df2, c("Health.Status", "variable"), function(x) sum(x[x$value=="Unlimited","(all)"]/sum(x[x$value=="85","(all)"])))
+%% print(ggplot(df3, aes(x = Health.Status, group=variable, y=V1)) + geom_line(aes(colour = variable)) + geom_point(aes(colour = variable)) + xlab("Health status") + ylab("Unlimied:85 ratio"))
+%% @
+%% \caption{The unlimited:85 ratio as a function of health status.}
+%% \end{figure}
 
 \end{document}
